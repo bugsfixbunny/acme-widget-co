@@ -26,13 +26,6 @@ final readonly class Product
             throw new InvalidArgumentException('Product code cannot be empty.');
         }
 
-        if (!is_finite($price) || $price < 0) {
-            throw new InvalidArgumentException(
-                sprintf('Price for product "%s" must be a non-negative amount, got %s.', $code, var_export($price, true)),
-            );
-        }
-
-        // round(), never a plain (int) cast: (int) (1.15 * 100) is 114, not 115.
-        $this->priceInCents = (int) round($price * 100);
+        $this->priceInCents = Cents::fromDollars($price, sprintf('Price for product "%s"', $code));
     }
 }
