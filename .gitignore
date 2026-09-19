@@ -1,0 +1,10 @@
+/vendor/
+/.phpunit.cache/
+.phpunit.result.cache
+composer.phar
+
+# Editors / OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
