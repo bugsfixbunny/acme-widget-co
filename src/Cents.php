@@ -12,6 +12,18 @@ use InvalidArgumentException;
  */
 final class Cents
 {
+    /**
+     * The largest amount this system handles.
+     *
+     * Bounding amounts is simpler and safer than defending the integer limit.
+     * The old guard let exactly PHP_INT_MAX / 100 through, where the
+     * multiplication tipped the cast over into a negative number, and even
+     * individually valid amounts could overflow once a basket summed them. At
+     * a million dollars apiece a basket would need some 92 billion products
+     * before its total in cents could overflow, which no basket can hold.
+     */
+    public const MAXIMUM_DOLLARS = 1_000_000.0;
+
     private function __construct()
     {
     }
@@ -29,12 +41,13 @@ final class Cents
             );
         }
 
-        if ($dollars > PHP_INT_MAX / 100) {
-            // Casting a float above PHP_INT_MAX to int does not overflow
-            // loudly, it just produces a wrong number.
-            throw new InvalidArgumentException(
-                sprintf('%s is too large to count in cents, got %s.', $description, var_export($dollars, true)),
-            );
+        if ($dollars > self::MAXIMUM_DOLLARS) {
+            throw new InvalidArgumentException(sprintf(
+                '%s must not be more than $%s, got %s.',
+                $description,
+                number_format(self::MAXIMUM_DOLLARS, 2),
+                var_export($dollars, true),
+            ));
         }
 
         // round(), never a plain (int) cast: (int) (1.15 * 100) is 114, not 115.

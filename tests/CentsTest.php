@@ -38,7 +38,7 @@ final class CentsTest extends TestCase
             'accumulated float error'   => [0.1 + 0.2, 30],
             'whole dollars'             => [12.0, 1200],
             'nothing'                   => [0.0, 0],
-            'a safely large amount'     => [1.0e12, 100000000000000],
+            'the largest amount allowed' => [1_000_000.00, 100_000_000],
         ];
     }
 
@@ -66,15 +66,40 @@ final class CentsTest extends TestCase
     }
 
     /**
-     * Casting a float above PHP_INT_MAX to int returns a wrong number instead
-     * of failing, so such an amount is refused before the cast happens.
+     * Amounts are bounded rather than merely kept under the integer limit.
+     * The old guard allowed exactly PHP_INT_MAX / 100, which the conversion
+     * then turned into a negative number, and sums of large-but-valid amounts
+     * could overflow a total.
      */
-    public function test_it_rejects_an_amount_too_large_to_count_in_cents(): void
+    #[DataProvider('amountsBeyondTheMaximum')]
+    public function test_it_rejects_an_amount_beyond_the_maximum(float $dollars): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Amount is too large to count in cents, got 1.0E+20.');
+        $this->expectExceptionMessage('Amount must not be more than $1,000,000.00');
 
-        Cents::fromDollars(1.0e20, 'Amount');
+        Cents::fromDollars($dollars, 'Amount');
+    }
+
+    /** @return array<string, array{float}> */
+    public static function amountsBeyondTheMaximum(): array
+    {
+        return [
+            'a cent over the maximum'    => [1_000_000.01],
+            'the old boundary case'      => [PHP_INT_MAX / 100],
+            'an absurd amount'           => [1.0e20],
+        ];
+    }
+
+    /**
+     * The amount that used to slip through now fails, rather than converting
+     * to a negative number of cents.
+     */
+    public function test_the_maximum_itself_is_allowed_and_converts_sanely(): void
+    {
+        $cents = Cents::fromDollars(Cents::MAXIMUM_DOLLARS, 'Amount');
+
+        self::assertSame(100_000_000, $cents);
+        self::assertGreaterThan(0, $cents);
     }
 
     public function test_it_names_the_amount_that_was_rejected(): void
