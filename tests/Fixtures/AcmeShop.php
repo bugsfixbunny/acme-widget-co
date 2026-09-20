@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Acme\Tests\Fixtures;
 
 use Acme\Basket;
-use Acme\Delivery\DeliveryBand;
+use Acme\Configuration\DeliveryConfiguration;
 use Acme\Delivery\ThresholdDeliveryRules;
 use Acme\Offer\BuyOneGetSecondHalfPriceOffer;
 use Acme\Product;
@@ -32,15 +32,14 @@ final class AcmeShop
     }
 
     /**
-     * Under $50 costs $4.95, under $90 costs $2.95, $90 or more is free.
+     * Read from the configuration file that ships with the project, rather
+     * than restated here, so every test measures the delivery charges Acme
+     * actually runs. A wrong edit to that file fails the documented example
+     * baskets, not just the tests that look at it directly.
      */
     public static function deliveryRules(): ThresholdDeliveryRules
     {
-        return new ThresholdDeliveryRules(
-            new DeliveryBand(spendAtLeast: 0.00, cost: 4.95),
-            new DeliveryBand(spendAtLeast: 50.00, cost: 2.95),
-            new DeliveryBand(spendAtLeast: 90.00, cost: 0.00),
-        );
+        return DeliveryConfiguration::fromJsonFile(__DIR__ . '/../../config/delivery.json');
     }
 
     public static function redWidgetOffer(): BuyOneGetSecondHalfPriceOffer

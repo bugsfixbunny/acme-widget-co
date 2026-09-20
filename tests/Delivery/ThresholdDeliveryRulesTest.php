@@ -7,7 +7,6 @@ namespace Acme\Tests\Delivery;
 use Acme\Cents;
 use Acme\Delivery\DeliveryBand;
 use Acme\Delivery\ThresholdDeliveryRules;
-use Acme\Tests\Fixtures\AcmeShop;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -19,13 +18,27 @@ use PHPUnit\Framework\TestCase;
 final class ThresholdDeliveryRulesTest extends TestCase
 {
     /**
+     * Acme's bands, written out rather than read from the configuration file,
+     * so this stays a test of how bands are chosen. Whether the shipped file
+     * says the right thing is DeliveryConfigurationTest's business.
+     */
+    private static function acmeRules(): ThresholdDeliveryRules
+    {
+        return new ThresholdDeliveryRules(
+            new DeliveryBand(spendAtLeast: 0.00, cost: 4.95),
+            new DeliveryBand(spendAtLeast: 50.00, cost: 2.95),
+            new DeliveryBand(spendAtLeast: 90.00, cost: 0.00),
+        );
+    }
+
+    /**
      * The boundaries are the whole point: $50 and $90 belong to the cheaper
      * band, because the spec says "under $50" and "$90 or more".
      */
     #[DataProvider('acmeSubtotals')]
     public function test_it_charges_the_band_the_order_reaches(int $subtotalInCents, int $expectedCharge): void
     {
-        self::assertSame($expectedCharge, AcmeShop::deliveryRules()->chargeFor($subtotalInCents));
+        self::assertSame($expectedCharge, self::acmeRules()->chargeFor($subtotalInCents));
     }
 
     /** @return array<string, array{int, int}> */
@@ -101,7 +114,7 @@ final class ThresholdDeliveryRulesTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('negative subtotal');
 
-        AcmeShop::deliveryRules()->chargeFor(-1);
+        self::acmeRules()->chargeFor(-1);
     }
 
     public function test_it_rejects_a_negative_threshold_or_cost(): void

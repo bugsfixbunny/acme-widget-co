@@ -68,6 +68,9 @@ $basket->total();        // 37.85
 $basket->totalInCents(); // 3785
 ```
 
+Delivery charges can also be read from a file rather than written out like
+this — see [Configuration](#configuration) below.
+
 The examples from the specification, all covered by
 [`tests/ExampleBasketsTest.php`](tests/ExampleBasketsTest.php):
 
@@ -97,6 +100,10 @@ in [`config/delivery.json`](config/delivery.json):
 ```php
 $deliveryRules = DeliveryConfiguration::fromJsonFile('config/delivery.json');
 ```
+
+The tests read the same file rather than restating the bands, so a wrong edit
+to it fails the documented example baskets and not merely the tests that look
+at delivery directly.
 
 Changing what delivery costs, or adding a band, is an edit to that file. It is
 read once at start-up and validated there — a missing section, a cost written

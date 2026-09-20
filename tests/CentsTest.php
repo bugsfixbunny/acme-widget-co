@@ -33,7 +33,6 @@ final class CentsTest extends TestCase
             'lands just below the cent' => [1.15, 115],
             'also lands just below'     => [8.20, 820],
             'lands just above the cent' => [32.95, 3295],
-            'red widget'                => [32.95, 3295],
             'green widget'              => [24.95, 2495],
             'blue widget'               => [7.95, 795],
             'accumulated float error'   => [0.1 + 0.2, 30],
