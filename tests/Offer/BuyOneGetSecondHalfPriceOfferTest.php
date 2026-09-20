@@ -51,10 +51,12 @@ final class BuyOneGetSecondHalfPriceOfferTest extends TestCase
      */
     public function test_the_odd_half_cent_is_kept_by_the_shop(): void
     {
-        $discount = $this->offer->discountFor(self::redWidgets(2));
+        $pair = self::redWidgets(2);
+        $discount = $this->offer->discountFor($pair);
+        $pairCosts = array_sum(array_map(static fn (Product $p): int => $p->priceInCents, $pair)) - $discount;
 
         self::assertSame(1648, $discount, 'The discount rounds up, not down.');
-        self::assertSame(4942, (3295 * 2) - $discount, 'Two red widgets cost $49.42.');
+        self::assertSame(4942, $pairCosts, 'Two red widgets cost $49.42.');
     }
 
     public function test_an_evenly_halved_price_loses_no_cents(): void

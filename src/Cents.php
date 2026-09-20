@@ -29,6 +29,14 @@ final class Cents
             );
         }
 
+        if ($dollars > PHP_INT_MAX / 100) {
+            // Casting a float above PHP_INT_MAX to int does not overflow
+            // loudly, it just produces a wrong number.
+            throw new InvalidArgumentException(
+                sprintf('%s is too large to count in cents, got %s.', $description, var_export($dollars, true)),
+            );
+        }
+
         // round(), never a plain (int) cast: (int) (1.15 * 100) is 114, not 115.
         return (int) round($dollars * 100);
     }

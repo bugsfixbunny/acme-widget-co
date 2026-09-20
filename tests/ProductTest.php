@@ -7,43 +7,28 @@ namespace Acme\Tests;
 use Acme\Product;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * Converting dollars to cents is Cents' job and is tested there; what matters
+ * here is that a product hands its price over and reports where a bad one came
+ * from.
+ */
 #[CoversClass(Product::class)]
 final class ProductTest extends TestCase
 {
-    public function test_it_exposes_its_code_and_name(): void
+    public function test_it_exposes_its_code_name_and_price_in_cents(): void
     {
         $product = new Product('R01', 'Red Widget', 32.95);
 
         self::assertSame('R01', $product->code);
         self::assertSame('Red Widget', $product->name);
+        self::assertSame(3295, $product->priceInCents);
     }
 
-    /**
-     * A plain (int) cast would lose a cent on prices such as $1.15, because
-     * 1.15 * 100 is 114.99999999999999 in binary floating point.
-     */
-    #[DataProvider('dollarPrices')]
-    public function test_it_converts_a_dollar_price_to_whole_cents(float $dollars, int $expectedCents): void
+    public function test_it_allows_a_free_product(): void
     {
-        self::assertSame($expectedCents, (new Product('X01', 'Widget', $dollars))->priceInCents);
-    }
-
-    /** @return array<string, array{float, int}> */
-    public static function dollarPrices(): array
-    {
-        return [
-            'red widget'            => [32.95, 3295],
-            'green widget'          => [24.95, 2495],
-            'blue widget'           => [7.95, 795],
-            'lands below the cent'  => [1.15, 115],
-            'also lands below'      => [8.20, 820],
-            'accumulated float'     => [0.1 + 0.2, 30],
-            'whole dollars'         => [12.0, 1200],
-            'free'                  => [0.0, 0],
-        ];
+        self::assertSame(0, (new Product('F01', 'Free Widget', 0.0))->priceInCents);
     }
 
     public function test_it_rejects_an_empty_code(): void
@@ -54,19 +39,11 @@ final class ProductTest extends TestCase
         new Product('   ', 'Nameless Widget', 1.00);
     }
 
-    public function test_it_rejects_a_negative_price(): void
+    public function test_it_reports_which_product_had_an_impossible_price(): void
     {
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('must be a non-negative amount');
+        $this->expectExceptionMessage('Price for product "R01" must be a non-negative amount, got -0.01.');
 
         new Product('R01', 'Red Widget', -0.01);
-    }
-
-    public function test_it_rejects_a_price_that_is_not_a_real_number(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('must be a non-negative amount');
-
-        new Product('R01', 'Red Widget', NAN);
     }
 }

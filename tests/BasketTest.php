@@ -137,6 +137,19 @@ final class BasketTest extends TestCase
         self::assertSame(8684 + 295, $basket->totalInCents());
     }
 
+    /**
+     * A named argument collects into the variadic under a string key rather
+     * than a numeric one, so the offers must be renumbered before use.
+     */
+    public function test_offers_passed_as_named_arguments_still_apply(): void
+    {
+        $basket = new Basket(AcmeShop::catalogue(), AcmeShop::deliveryRules(), ...['halfPrice' => AcmeShop::redWidgetOffer()]);
+        $basket->add('R01');
+        $basket->add('R01');
+
+        self::assertSame(4942 + 495, $basket->totalInCents());
+    }
+
     public function test_it_asks_the_delivery_rules_for_the_discounted_subtotal(): void
     {
         $spy = new class implements DeliveryChargeRules {

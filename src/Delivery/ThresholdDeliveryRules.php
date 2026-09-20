@@ -32,27 +32,29 @@ final readonly class ThresholdDeliveryRules implements DeliveryChargeRules
             throw new InvalidArgumentException('At least one delivery band is required.');
         }
 
-        $seen = [];
+        $byThreshold = [];
 
         foreach ($bands as $band) {
-            if (isset($seen[$band->spendAtLeastInCents])) {
+            if (isset($byThreshold[$band->spendAtLeastInCents])) {
                 throw new InvalidArgumentException(
                     sprintf('Duplicate delivery band for a spend of %d cents.', $band->spendAtLeastInCents),
                 );
             }
 
-            $seen[$band->spendAtLeastInCents] = true;
+            $byThreshold[$band->spendAtLeastInCents] = $band;
         }
 
-        if (!isset($seen[0])) {
+        if (!isset($byThreshold[0])) {
             throw new InvalidArgumentException(
                 'Delivery bands must include one starting at $0.00, otherwise small orders have no charge.',
             );
         }
 
-        usort($bands, static fn (DeliveryBand $a, DeliveryBand $b): int => $b->spendAtLeastInCents <=> $a->spendAtLeastInCents);
+        // Highest threshold first, so the first band an order reaches is the
+        // best one it qualifies for.
+        krsort($byThreshold);
 
-        $this->bands = $bands;
+        $this->bands = array_values($byThreshold);
     }
 
     public function chargeFor(int $subtotalInCents): int
