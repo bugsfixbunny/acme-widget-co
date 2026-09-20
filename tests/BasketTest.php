@@ -9,6 +9,8 @@ use Acme\Delivery\DeliveryChargeRules;
 use Acme\Exception\UnknownProductException;
 use Acme\Offer\BuyOneGetSecondHalfPriceOffer;
 use Acme\Offer\Offer;
+use Acme\Product;
+use Acme\ProductCatalogue;
 use Acme\Tests\Fixtures\AcmeShop;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
@@ -69,6 +71,44 @@ final class BasketTest extends TestCase
         // $49.42 after the offer, which is under $50, so delivery is $4.95.
         // Banding on the undiscounted $65.90 would have charged $2.95.
         self::assertSame(4942 + 495, $basket->totalInCents());
+    }
+
+    /**
+     * Three red widgets come to $98.85, which would qualify for free delivery,
+     * but the offer brings the order down to $82.37 and delivery is charged.
+     */
+    public function test_a_discount_can_drop_an_order_out_of_free_delivery(): void
+    {
+        $basket = AcmeShop::basket();
+
+        foreach (['R01', 'R01', 'R01'] as $code) {
+            $basket->add($code);
+        }
+
+        self::assertSame(8237 + 295, $basket->totalInCents());
+    }
+
+    /**
+     * Acme's own prices cannot add up to exactly $50 or $90, so the boundaries
+     * are exercised here with a catalogue that can reach them.
+     */
+    public function test_an_order_landing_exactly_on_a_band_boundary_takes_the_cheaper_band(): void
+    {
+        $catalogue = new ProductCatalogue(
+            new Product('H01', 'Half Century Widget', 25.00),
+            new Product('N01', 'Ninety Widget', 45.00),
+        );
+
+        $exactlyFifty = new Basket($catalogue, AcmeShop::deliveryRules());
+        $exactlyFifty->add('H01');
+        $exactlyFifty->add('H01');
+
+        $exactlyNinety = new Basket($catalogue, AcmeShop::deliveryRules());
+        $exactlyNinety->add('N01');
+        $exactlyNinety->add('N01');
+
+        self::assertSame(5000 + 295, $exactlyFifty->totalInCents(), '$50.00 exactly pays $2.95.');
+        self::assertSame(9000, $exactlyNinety->totalInCents(), '$90.00 exactly ships free.');
     }
 
     public function test_it_works_without_any_offers(): void
