@@ -66,6 +66,52 @@ final class BasketTest extends TestCase
         AcmeShop::basket()->add('Z99');
     }
 
+    /**
+     * Working out the total must not consume or alter the basket.
+     */
+    public function test_asking_for_the_total_twice_gives_the_same_answer(): void
+    {
+        $basket = AcmeShop::basket();
+        $basket->add('R01');
+        $basket->add('R01');
+
+        $first = $basket->totalInCents();
+
+        self::assertSame($first, $basket->totalInCents());
+        self::assertSame($first / 100, $basket->total());
+    }
+
+    public function test_adding_a_product_after_working_out_the_total_changes_it(): void
+    {
+        $basket = AcmeShop::basket();
+        $basket->add('B01');
+
+        self::assertSame(795 + 495, $basket->totalInCents());
+
+        $basket->add('B01');
+
+        self::assertSame(1590 + 495, $basket->totalInCents(), 'The second widget must be counted.');
+    }
+
+    /**
+     * A rejected code must not leave a half-added product behind.
+     */
+    public function test_a_failed_add_leaves_the_basket_as_it_was(): void
+    {
+        $basket = AcmeShop::basket();
+        $basket->add('G01');
+        $before = $basket->totalInCents();
+
+        try {
+            $basket->add('Z99');
+            self::fail('Adding an unknown product code should have thrown.');
+        } catch (UnknownProductException) {
+            // expected
+        }
+
+        self::assertSame($before, $basket->totalInCents());
+    }
+
     public function test_offers_are_applied_before_delivery_is_worked_out(): void
     {
         $basket = AcmeShop::basket();
