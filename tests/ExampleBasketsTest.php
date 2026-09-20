@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Acme\Tests;
 
 use Acme\Basket;
-use Acme\Delivery\DeliveryBand;
 use Acme\Delivery\ThresholdDeliveryRules;
 use Acme\Offer\BuyOneGetSecondHalfPriceOffer;
-use Acme\Product;
 use Acme\ProductCatalogue;
+use Acme\Tests\Fixtures\AcmeShop;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -30,7 +29,7 @@ final class ExampleBasketsTest extends TestCase
     #[DataProvider('exampleBaskets')]
     public function test_it_totals_the_documented_baskets(array $productCodes, float $expectedTotal): void
     {
-        $basket = $this->acmeBasket();
+        $basket = AcmeShop::basket();
 
         foreach ($productCodes as $code) {
             $basket->add($code);
@@ -59,8 +58,8 @@ final class ExampleBasketsTest extends TestCase
      */
     public function test_the_order_products_are_added_does_not_matter(): void
     {
-        $asListed = $this->acmeBasket();
-        $shuffled = $this->acmeBasket();
+        $asListed = AcmeShop::basket();
+        $shuffled = AcmeShop::basket();
 
         foreach (['B01', 'B01', 'R01', 'R01', 'R01'] as $code) {
             $asListed->add($code);
@@ -72,22 +71,5 @@ final class ExampleBasketsTest extends TestCase
 
         self::assertSame(98.27, $asListed->total());
         self::assertSame($asListed->total(), $shuffled->total());
-    }
-
-    private function acmeBasket(): Basket
-    {
-        $catalogue = new ProductCatalogue(
-            new Product('R01', 'Red Widget', 32.95),
-            new Product('G01', 'Green Widget', 24.95),
-            new Product('B01', 'Blue Widget', 7.95),
-        );
-
-        $deliveryRules = new ThresholdDeliveryRules(
-            new DeliveryBand(spendAtLeast: 0.00, cost: 4.95),
-            new DeliveryBand(spendAtLeast: 50.00, cost: 2.95),
-            new DeliveryBand(spendAtLeast: 90.00, cost: 0.00),
-        );
-
-        return new Basket($catalogue, $deliveryRules, new BuyOneGetSecondHalfPriceOffer('R01'));
     }
 }
