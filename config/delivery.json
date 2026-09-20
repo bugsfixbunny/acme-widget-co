@@ -1,0 +1,7 @@
+{
+    "delivery": [
+        { "spendAtLeast": 0.00,  "cost": 4.95 },
+        { "spendAtLeast": 50.00, "cost": 2.95 },
+        { "spendAtLeast": 90.00, "cost": 0.00 }
+    ]
+}

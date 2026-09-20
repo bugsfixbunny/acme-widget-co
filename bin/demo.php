@@ -4,8 +4,7 @@
 declare(strict_types=1);
 
 use Acme\Basket;
-use Acme\Delivery\DeliveryBand;
-use Acme\Delivery\ThresholdDeliveryRules;
+use Acme\Configuration\DeliveryConfiguration;
 use Acme\Offer\BuyOneGetSecondHalfPriceOffer;
 use Acme\Product;
 use Acme\ProductCatalogue;
@@ -18,11 +17,7 @@ $catalogue = new ProductCatalogue(
     new Product('B01', 'Blue Widget', 7.95),
 );
 
-$deliveryRules = new ThresholdDeliveryRules(
-    new DeliveryBand(spendAtLeast: 0.00, cost: 4.95),
-    new DeliveryBand(spendAtLeast: 50.00, cost: 2.95),
-    new DeliveryBand(spendAtLeast: 90.00, cost: 0.00),
-);
+$deliveryRules = DeliveryConfiguration::fromJsonFile(__DIR__ . '/../config/delivery.json');
 
 /** @var list<array{products: list<string>, expected: float}> the baskets given in the specification */
 $examples = [

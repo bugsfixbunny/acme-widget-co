@@ -78,6 +78,45 @@ The examples from the specification, all covered by
 | R01, G01                | $60.85   |
 | B01, B01, R01, R01, R01 | $98.27   |
 
+## Configuration
+
+The brief leaves the format of these rules open. Delivery charges are the ones
+that change most often and carry no code with them, so they are defined as data
+in [`config/delivery.json`](config/delivery.json):
+
+```json
+{
+    "delivery": [
+        { "spendAtLeast": 0.00,  "cost": 4.95 },
+        { "spendAtLeast": 50.00, "cost": 2.95 },
+        { "spendAtLeast": 90.00, "cost": 0.00 }
+    ]
+}
+```
+
+```php
+$deliveryRules = DeliveryConfiguration::fromJsonFile('config/delivery.json');
+```
+
+Changing what delivery costs, or adding a band, is an edit to that file. It is
+read once at start-up and validated there — a missing section, a cost written
+as text, an entry that is not an object — so a mistake fails immediately with a
+message naming what is wrong, rather than at a customer's checkout. What makes
+a *usable* set of bands is still `ThresholdDeliveryRules`' own business:
+configuration cannot sneak past the rule that the bands must cover every order.
+
+The catalogue and the offers are still declared in PHP. They could follow the
+same pattern, and the section below says what that would take.
+
+**The file is a first step, not the destination.** It suits a proof of concept
+because it is versioned, reviewable and needs no infrastructure, but delivery
+charges are eventually something Acme's own staff should edit without a
+deployment. The next step is to read them from a database instead — see
+[Where this would go next](#where-this-would-go-next). Because the rules are
+built behind `DeliveryConfiguration` rather than in the domain, that is a second
+source producing the same `ThresholdDeliveryRules`, and nothing that uses them
+changes.
+
 ## How it works
 
 ```
@@ -86,12 +125,15 @@ src/
 ├── Cents.php                             dollars in, whole cents out
 ├── Product.php                           a code, a name and a price
 ├── ProductCatalogue.php                  products indexed by code
+├── Configuration/
+│   └── DeliveryConfiguration.php         delivery bands from a file or an array
 ├── Delivery/
 │   ├── DeliveryChargeRules.php           interface: subtotal in, charge out
 │   ├── DeliveryBand.php                  "spend at least X, pay Y"
 │   └── ThresholdDeliveryRules.php        picks the best band an order reaches
 ├── Exception/
 │   ├── DiscountExceedsBasketException.php
+│   ├── InvalidConfigurationException.php
 │   └── UnknownProductException.php
 └── Offer/
     ├── Offer.php                         interface: basket in, discount out
@@ -245,8 +287,46 @@ and "the initial offer" suggests more are coming.
 - **Line items with quantities.** `add('R01', 3)` and a basket that stores counts
   rather than repeated objects — better for display, and offers could work from
   counts instead of scanning the whole basket.
-- **Load the catalogue from configuration** rather than constructing it in code,
-  once prices live somewhere other than a developer's editor.
+- **Move the catalogue into configuration too.** Delivery bands already live in
+  a file; products would follow the same shape — a `products` section read and
+  validated by a loader like `DeliveryConfiguration`. Prices then change without
+  a deploy. It needs two decisions first that delivery did not: what happens to
+  an order already in progress when a price changes, and whether a product code
+  that disappears from the file should break baskets that still hold it.
+- **Define which offers run in configuration.** This one is more than a loader.
+  Offers carry behaviour, so a file can only say *which* promotions are on and
+  with what parameters — something like
+  `{ "type": "buy_one_get_second_half_price", "product": "R01" }` resolved
+  through a registry of offer types, with each new kind of promotion still a
+  class implementing `Offer`. The blocker is not the loading: the moment two
+  offers can be switched on from a file, the question above about how
+  overlapping offers combine has to be answered first, because today they
+  would both discount the same products.
+- **Move the delivery configuration out of the file and into a database.** This
+  is the intended next step for the work already done: `config/delivery.json`
+  and `DeliveryConfiguration::fromJsonFile()` are the proof of concept's version
+  of something a real shop keeps in a table, so that staff can change what
+  delivery costs through an admin screen rather than by editing a file in a
+  release. The catalogue and the offers would land in the same place once they
+  move into configuration.
+
+  The shape of it: a second loader — `DeliveryConfiguration::fromDatabase()`, or
+  a separate class if the two grow apart — reading rows and returning the same
+  `ThresholdDeliveryRules`. Everything downstream is untouched, because the
+  domain never learns where the bands came from.
+
+  What a database needs that a file does not: **caching**, since rules would
+  otherwise be read on every request; **effective dates**, so a change can be
+  scheduled rather than taking effect the instant it is saved; an **audit
+  trail**, because "who made delivery free and when" becomes a real question;
+  **validation moved to the point of editing**, so a bad row is refused when it
+  is typed rather than at start-up; and a decision about **what an order already
+  in progress should use** when the rules change underneath it. The JSON file
+  would likely survive as the default for local development and tests, which is
+  why the loader takes a path rather than assuming one.
+
+  Left out here deliberately: this is a proof of concept on a fixed budget, and
+  the file proves the design without the infrastructure.
 - **Mutation testing in CI**, which needs a coverage driver installed on the
   runner. It has already proved its worth here (see below).
 
@@ -256,7 +336,7 @@ and "the initial offer" suggests more are coming.
 composer check
 ```
 
-75 tests covering the specification's four example baskets end to end, every
+90 tests covering the specification's four example baskets end to end, every
 delivery band boundary, the rounding rule, and the validation each class
 performs. [`tests/Fixtures/AcmeShop.php`](tests/Fixtures/AcmeShop.php) holds
 Acme's configuration once so no test restates the price list.
@@ -268,7 +348,7 @@ Quality is enforced by more than the suite passing:
   a `list`, because a named argument gives the collected array a string key.
 - **PHPUnit strict settings** — the suite fails on warnings and on risky tests.
 - **Mutation testing** (Infection) was used during development and reached an
-  MSI of 92%. It found that `round()` could be replaced with `floor()` or
+  MSI of 93%. It found that `round()` could be replaced with `floor()` or
   `ceil()` without a single test failing, because PHPUnit attributes coverage
   only to the classes a test declares with `#[CoversClass]`, and the conversion
   cases lived in the wrong test class. The surviving mutants are documented
