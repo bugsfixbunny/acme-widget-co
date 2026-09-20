@@ -6,6 +6,7 @@ namespace Acme;
 
 use Acme\Delivery\DeliveryChargeRules;
 use Acme\Exception\DiscountExceedsBasketException;
+use Acme\Exception\NegativeAmountException;
 use Acme\Exception\UnknownProductException;
 use Acme\Offer\Offer;
 
@@ -76,7 +77,7 @@ final class Basket
 
         $subtotal -= $discount;
 
-        return $subtotal + $this->deliveryRules->chargeFor($subtotal);
+        return $subtotal + $this->deliveryCharge($subtotal);
     }
 
     private function totalDiscount(): int
@@ -84,9 +85,26 @@ final class Basket
         $discount = 0;
 
         foreach ($this->offers as $offer) {
-            $discount += $offer->discountFor($this->products);
+            $offered = $offer->discountFor($this->products);
+
+            if ($offered < 0) {
+                throw NegativeAmountException::discountFrom($offer::class, $offered);
+            }
+
+            $discount += $offered;
         }
 
         return $discount;
+    }
+
+    private function deliveryCharge(int $subtotalInCents): int
+    {
+        $charge = $this->deliveryRules->chargeFor($subtotalInCents);
+
+        if ($charge < 0) {
+            throw NegativeAmountException::deliveryChargeFrom($this->deliveryRules::class, $charge);
+        }
+
+        return $charge;
     }
 }

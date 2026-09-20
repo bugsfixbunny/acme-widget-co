@@ -7,6 +7,7 @@ namespace Acme\Tests;
 use Acme\Basket;
 use Acme\Delivery\DeliveryChargeRules;
 use Acme\Exception\DiscountExceedsBasketException;
+use Acme\Exception\NegativeAmountException;
 use Acme\Exception\UnknownProductException;
 use Acme\Offer\BuyOneGetSecondHalfPriceOffer;
 use Acme\Offer\Offer;
@@ -18,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 
 #[CoversClass(Basket::class)]
 #[CoversClass(DiscountExceedsBasketException::class)]
+#[CoversClass(NegativeAmountException::class)]
 final class BasketTest extends TestCase
 {
     public function test_it_totals_the_products_it_was_given(): void
@@ -213,6 +215,46 @@ final class BasketTest extends TestCase
         $basket->add('B01');
 
         self::assertSame(495, $basket->totalInCents());
+    }
+
+    /**
+     * Nothing in the Offer interface stops an implementation returning a
+     * negative number, which would quietly add to the customer's bill.
+     */
+    public function test_it_rejects_an_offer_that_adds_to_the_bill(): void
+    {
+        $surcharge = new class implements Offer {
+            public function discountFor(array $products): int
+            {
+                return -100;
+            }
+        };
+
+        $basket = new Basket(AcmeShop::catalogue(), AcmeShop::deliveryRules(), $surcharge);
+        $basket->add('B01');
+
+        $this->expectException(NegativeAmountException::class);
+        $this->expectExceptionMessage('returned a discount of -$1.00. A discount cannot be negative.');
+
+        $basket->totalInCents();
+    }
+
+    public function test_it_rejects_delivery_rules_that_pay_the_customer(): void
+    {
+        $refund = new class implements DeliveryChargeRules {
+            public function chargeFor(int $subtotalInCents): int
+            {
+                return -500;
+            }
+        };
+
+        $basket = new Basket(AcmeShop::catalogue(), $refund);
+        $basket->add('B01');
+
+        $this->expectException(NegativeAmountException::class);
+        $this->expectExceptionMessage('returned a charge of -$5.00. Delivery cannot cost less than nothing.');
+
+        $basket->totalInCents();
     }
 
     public function test_an_offer_that_never_applies_changes_nothing(): void
