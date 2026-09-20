@@ -57,7 +57,10 @@ final class DeliveryConfiguration
     {
         $entries = $configuration['delivery'] ?? throw InvalidConfigurationException::missingSection('delivery');
 
-        if (!is_array($entries)) {
+        // array_is_list(), because is_array() alone accepted a keyed structure
+        // such as ['standard' => [...]], which the documented format does not
+        // allow and the error message already said was wrong.
+        if (!is_array($entries) || !array_is_list($entries)) {
             throw InvalidConfigurationException::sectionIsNotAList('delivery');
         }
 

@@ -114,6 +114,23 @@ final class DeliveryConfigurationTest extends TestCase
         DeliveryConfiguration::fromArray(['delivery' => 'free']);
     }
 
+    /**
+     * A keyed structure is not the documented format, and accepting one would
+     * mean an entry's key silently meant nothing.
+     */
+    public function test_it_reports_a_delivery_section_that_is_keyed_rather_than_a_list(): void
+    {
+        $this->expectException(InvalidConfigurationException::class);
+        $this->expectExceptionMessage('section "delivery" must be a list of entries');
+
+        DeliveryConfiguration::fromArray([
+            'delivery' => [
+                'standard' => ['spendAtLeast' => 0, 'cost' => 4.95],
+                'premium' => ['spendAtLeast' => 50, 'cost' => 2.95],
+            ],
+        ]);
+    }
+
     public function test_it_reports_an_entry_that_is_not_an_object(): void
     {
         $this->expectException(InvalidConfigurationException::class);
