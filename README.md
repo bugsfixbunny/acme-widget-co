@@ -16,6 +16,22 @@ composer install
 composer test     # run the test suite
 composer stan     # run static analysis
 composer check    # both of the above
+
+php bin/demo.php  # print the specification's example baskets and their totals
+```
+
+`bin/demo.php` exits non-zero if any total does not match the specification, so
+it doubles as a smoke test:
+
+```
+Basket                         Expected      Total
+----------------------------------------------------------
+B01, G01                         $37.85     $37.85  ok
+R01, R01                         $54.37     $54.37  ok
+R01, G01                         $60.85     $60.85  ok
+B01, B01, R01, R01, R01          $98.27     $98.27  ok
+----------------------------------------------------------
+All baskets match the specification.
 ```
 
 ## Usage
