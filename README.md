@@ -91,6 +91,7 @@ src/
 │   ├── DeliveryBand.php                  "spend at least X, pay Y"
 │   └── ThresholdDeliveryRules.php        picks the best band an order reaches
 ├── Exception/
+│   ├── DiscountExceedsBasketException.php
 │   └── UnknownProductException.php
 └── Offer/
     ├── Offer.php                         interface: basket in, discount out
@@ -176,10 +177,13 @@ to deliver nothing.
 `UnknownProductException`. Normalising the case silently would hide a caller's
 typo.
 
-**A misconfigured offer fails loudly.** If an offer ever discounted more than
-the basket holds, the subtotal would go negative and the delivery rules throw
-rather than clamping to zero, so the misconfiguration surfaces instead of
-quietly producing a plausible total.
+**Discounting more than the basket is worth fails loudly.** One offer cannot do
+it; two that overlap can — half off a $7.95 widget plus $5.00 off the order is
+$8.97 of discount on $7.95 of goods. The basket throws
+`DiscountExceedsBasketException` naming both figures rather than clamping to
+zero, so a promotion that has been configured to give stock away surfaces
+instead of quietly producing a plausible total. If Acme would rather such a
+basket simply cost nothing, that is a one-line change to clamp instead.
 
 **`total()` returns dollars as a float, for display.** `totalInCents()` returns
 the same figure as an exact integer for anything that cannot afford a float —
@@ -252,7 +256,7 @@ and "the initial offer" suggests more are coming.
 composer check
 ```
 
-73 tests covering the specification's four example baskets end to end, every
+75 tests covering the specification's four example baskets end to end, every
 delivery band boundary, the rounding rule, and the validation each class
 performs. [`tests/Fixtures/AcmeShop.php`](tests/Fixtures/AcmeShop.php) holds
 Acme's configuration once so no test restates the price list.
@@ -264,7 +268,7 @@ Quality is enforced by more than the suite passing:
   a `list`, because a named argument gives the collected array a string key.
 - **PHPUnit strict settings** — the suite fails on warnings and on risky tests.
 - **Mutation testing** (Infection) was used during development and reached an
-  MSI of 91%. It found that `round()` could be replaced with `floor()` or
+  MSI of 92%. It found that `round()` could be replaced with `floor()` or
   `ceil()` without a single test failing, because PHPUnit attributes coverage
   only to the classes a test declares with `#[CoversClass]`, and the conversion
   cases lived in the wrong test class. The surviving mutants are documented

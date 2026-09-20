@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Acme;
 
 use Acme\Delivery\DeliveryChargeRules;
+use Acme\Exception\DiscountExceedsBasketException;
 use Acme\Exception\UnknownProductException;
 use Acme\Offer\Offer;
 
@@ -65,7 +66,15 @@ final class Basket
             $this->products,
         ));
 
-        $subtotal -= $this->totalDiscount();
+        $discount = $this->totalDiscount();
+
+        if ($discount > $subtotal) {
+            // Caught here rather than left to the delivery rules, which would
+            // otherwise report a negative subtotal and blame the wrong thing.
+            throw DiscountExceedsBasketException::of($subtotal, $discount);
+        }
+
+        $subtotal -= $discount;
 
         return $subtotal + $this->deliveryRules->chargeFor($subtotal);
     }

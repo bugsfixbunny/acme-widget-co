@@ -6,6 +6,7 @@ namespace Acme\Tests;
 
 use Acme\Basket;
 use Acme\Delivery\DeliveryChargeRules;
+use Acme\Exception\DiscountExceedsBasketException;
 use Acme\Exception\UnknownProductException;
 use Acme\Offer\BuyOneGetSecondHalfPriceOffer;
 use Acme\Offer\Offer;
@@ -16,6 +17,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
 #[CoversClass(Basket::class)]
+#[CoversClass(DiscountExceedsBasketException::class)]
 final class BasketTest extends TestCase
 {
     public function test_it_totals_the_products_it_was_given(): void
@@ -169,6 +171,48 @@ final class BasketTest extends TestCase
         $basket->totalInCents();
 
         self::assertSame(4942, $spy->subtotalSeen);
+    }
+
+    /**
+     * Two offers that overlap on a cheap basket can between them discount more
+     * than it is worth. The basket says so itself rather than leaving the
+     * delivery rules to complain about a negative subtotal.
+     */
+    public function test_it_refuses_to_discount_more_than_the_basket_is_worth(): void
+    {
+        $fiveDollarsOff = new class implements Offer {
+            public function discountFor(array $products): int
+            {
+                return 500;
+            }
+        };
+
+        $basket = new Basket(AcmeShop::catalogue(), AcmeShop::deliveryRules(), $fiveDollarsOff, $fiveDollarsOff);
+        $basket->add('B01');
+
+        $this->expectException(DiscountExceedsBasketException::class);
+        $this->expectExceptionMessage('Offers discounted $10.00 from a basket worth $7.95.');
+
+        $basket->totalInCents();
+    }
+
+    /**
+     * Discounting a basket down to nothing is a giveaway, not a mistake, so it
+     * is allowed — the customer still pays to have it delivered.
+     */
+    public function test_an_offer_may_discount_a_basket_down_to_nothing(): void
+    {
+        $everythingOff = new class implements Offer {
+            public function discountFor(array $products): int
+            {
+                return array_sum(array_map(static fn (Product $p): int => $p->priceInCents, $products));
+            }
+        };
+
+        $basket = new Basket(AcmeShop::catalogue(), AcmeShop::deliveryRules(), $everythingOff);
+        $basket->add('B01');
+
+        self::assertSame(495, $basket->totalInCents());
     }
 
     public function test_an_offer_that_never_applies_changes_nothing(): void
