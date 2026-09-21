@@ -330,10 +330,11 @@ and "the initial offer" suggests more are coming.
 composer check
 ```
 
-102 tests covering the specification's four example baskets end to end, every
+The suite covers the specification's four example baskets end to end, every
 delivery band boundary, the rounding rule, the basket lifecycle, and the
-validation each class performs. [`tests/Fixtures/AcmeShop.php`](tests/Fixtures/AcmeShop.php) holds
-Acme's configuration once so no test restates the price list.
+validation each class performs.
+[`tests/Fixtures/AcmeShop.php`](tests/Fixtures/AcmeShop.php) holds Acme's
+configuration once, so no test restates the price list.
 
 Quality is enforced by more than the suite passing:
 
@@ -341,15 +342,5 @@ Quality is enforced by more than the suite passing:
   typing error during development: a variadic parameter is not guaranteed to be
   a `list`, because a named argument gives the collected array a string key.
 - **PHPUnit strict settings** — the suite fails on warnings and on risky tests.
-- **Mutation testing** (Infection) was run during development, reaching a
-  mutation score of 95%. It is not part of the committed tooling and needs a
-  coverage driver, so that figure is a development-time measurement rather than
-  something this repository reproduces. It found that `round()` could be
-  replaced with `floor()` or
-  `ceil()` without a single test failing, because PHPUnit attributes coverage
-  only to the classes a test declares with `#[CoversClass]`, and the conversion
-  cases lived in the wrong test class. The surviving mutants are documented
-  equivalents, such as `array_values()` calls that exist to satisfy the type
-  system rather than to change behaviour.
 - **CI** runs the tests, static analysis and `composer validate --strict` on PHP
   8.2, 8.3 and 8.4.
