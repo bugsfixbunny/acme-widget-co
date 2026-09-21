@@ -115,15 +115,6 @@ configuration cannot sneak past the rule that the bands must cover every order.
 The catalogue and the offers are still declared in PHP. They could follow the
 same pattern, and the section below says what that would take.
 
-**The file is a first step, not the destination.** It suits a proof of concept
-because it is versioned, reviewable and needs no infrastructure, but delivery
-charges are eventually something Acme's own staff should edit without a
-deployment. The next step is to read them from a database instead — see
-[Where this would go next](#where-this-would-go-next). Because the rules are
-built behind `DeliveryConfiguration` rather than in the domain, that is a second
-source producing the same `ThresholdDeliveryRules`, and nothing that uses them
-changes.
-
 ## How it works
 
 ```
@@ -141,6 +132,7 @@ src/
 ├── Exception/
 │   ├── DiscountExceedsBasketException.php
 │   ├── InvalidConfigurationException.php
+│   ├── NegativeAmountException.php
 │   └── UnknownProductException.php
 └── Offer/
     ├── Offer.php                         interface: basket in, discount out
@@ -193,18 +185,18 @@ calculation after that is integer arithmetic, so no total drifts.
 **The conversion rounds rather than casts.** `1.15 * 100` is
 `114.99999999999999` in binary floating point, so `(int) ($dollars * 100)` would
 silently lose a cent. `Cents::fromDollars()` uses `round()`, and refuses
-negative amounts, values that are not real numbers, and amounts so large that
-the cast to `int` would return a wrong number instead of failing.
+negative amounts and values that are not real numbers.
 
 **A price with more than two decimal places is rounded to the nearest cent.**
 `32.955` becomes `3296` without complaint. Acceptable for a price list; if Acme
 would rather that be an error, it is one guard in `Cents::fromDollars()`.
 
-**The half-price widget rounds down, so the shop keeps the odd half cent.**
+**The half-price widget rounds down, so the customer keeps the odd half cent.**
 Half of $32.95 is $16.475, which cannot be paid. The second widget costs $16.47
-and the discount is $16.48, making the pair $49.42. This is not arbitrary — it
-is what the specification's own totals require. Rounding the other way gives
-$54.38 and $98.28 instead of the documented $54.37 and $98.27.
+rather than $16.48, making the discount $16.48 and the pair $49.42 — half a
+cent in the customer's favour. This is not arbitrary: it is what the
+specification's own totals require. Rounding the other way gives $54.38 and
+$98.28 instead of the documented $54.37 and $98.27.
 
 **Offers are applied before delivery is worked out.** Two red widgets come to
 $49.42 after the offer, which is *under* $50, so delivery costs $4.95 — banding
@@ -226,17 +218,37 @@ to deliver nothing.
 `UnknownProductException`. Normalising the case silently would hide a caller's
 typo.
 
-**Discounting more than the basket is worth fails loudly.** One offer cannot do
-it; two that overlap can — half off a $7.95 widget plus $5.00 off the order is
-$8.97 of discount on $7.95 of goods. The basket throws
+**Offers stack, and that is the current policy.** Every offer is asked for a
+discount and all of them are applied, so two promotions covering the same
+product both come off. The bundled configuration runs one offer, so this cannot
+happen today; the *Questions* section below explains why it needs an answer
+from Acme before a second promotion is switched on.
+
+**Nonsense results from offers and delivery are refused.** The interfaces
+promise only an `int`, so an implementation could return a negative discount —
+which would quietly add to the bill — or a negative delivery charge. Both throw
+`NegativeAmountException`, naming the class at fault.
+
+**Discounting more than the basket is worth fails loudly.** Two overlapping
+offers can do it — half off a $7.95 widget plus $5.00 off the order is $8.97 of
+discount on $7.95 of goods — and so can a single faulty one, since nothing in
+the `Offer` interface bounds what it returns. The basket throws
 `DiscountExceedsBasketException` naming both figures rather than clamping to
-zero, so a promotion that has been configured to give stock away surfaces
-instead of quietly producing a plausible total. If Acme would rather such a
-basket simply cost nothing, that is a one-line change to clamp instead.
+zero, so a promotion configured to give stock away surfaces instead of quietly
+producing a plausible total. Discounting a basket to exactly nothing is allowed:
+that is a giveaway, and the customer still pays delivery.
+
+**Amounts are capped at $1,000,000.** Bounding what the system handles is
+simpler than defending the integer limit, where exactly `PHP_INT_MAX / 100`
+converted to a *negative* number of cents and sums of large amounts could
+overflow. At a million dollars apiece a basket would need some 92 billion
+products before its total could overflow, so one bound closes both.
 
 **`total()` returns dollars as a float, for display.** `totalInCents()` returns
-the same figure as an exact integer for anything that cannot afford a float —
-that is also what the tests assert against, so no test compares floats.
+the same figure as an exact integer, which is what most tests assert against.
+The example baskets deliberately assert both: the dollar figures the
+specification documents, and the same totals in cents, so the headline
+assertions do not rest on floating-point comparison alone.
 
 **Out of scope for a proof of concept:** tax, currencies other than dollars,
 persistence, quantities on `add()` (call it twice), removing products, and
@@ -309,31 +321,6 @@ and "the initial offer" suggests more are coming.
   offers can be switched on from a file, the question above about how
   overlapping offers combine has to be answered first, because today they
   would both discount the same products.
-- **Move the delivery configuration out of the file and into a database.** This
-  is the intended next step for the work already done: `config/delivery.json`
-  and `DeliveryConfiguration::fromJsonFile()` are the proof of concept's version
-  of something a real shop keeps in a table, so that staff can change what
-  delivery costs through an admin screen rather than by editing a file in a
-  release. The catalogue and the offers would land in the same place once they
-  move into configuration.
-
-  The shape of it: a second loader — `DeliveryConfiguration::fromDatabase()`, or
-  a separate class if the two grow apart — reading rows and returning the same
-  `ThresholdDeliveryRules`. Everything downstream is untouched, because the
-  domain never learns where the bands came from.
-
-  What a database needs that a file does not: **caching**, since rules would
-  otherwise be read on every request; **effective dates**, so a change can be
-  scheduled rather than taking effect the instant it is saved; an **audit
-  trail**, because "who made delivery free and when" becomes a real question;
-  **validation moved to the point of editing**, so a bad row is refused when it
-  is typed rather than at start-up; and a decision about **what an order already
-  in progress should use** when the rules change underneath it. The JSON file
-  would likely survive as the default for local development and tests, which is
-  why the loader takes a path rather than assuming one.
-
-  Left out here deliberately: this is a proof of concept on a fixed budget, and
-  the file proves the design without the infrastructure.
 - **Mutation testing in CI**, which needs a coverage driver installed on the
   runner. It has already proved its worth here (see below).
 
@@ -343,9 +330,9 @@ and "the initial offer" suggests more are coming.
 composer check
 ```
 
-90 tests covering the specification's four example baskets end to end, every
-delivery band boundary, the rounding rule, and the validation each class
-performs. [`tests/Fixtures/AcmeShop.php`](tests/Fixtures/AcmeShop.php) holds
+102 tests covering the specification's four example baskets end to end, every
+delivery band boundary, the rounding rule, the basket lifecycle, and the
+validation each class performs. [`tests/Fixtures/AcmeShop.php`](tests/Fixtures/AcmeShop.php) holds
 Acme's configuration once so no test restates the price list.
 
 Quality is enforced by more than the suite passing:
@@ -354,8 +341,11 @@ Quality is enforced by more than the suite passing:
   typing error during development: a variadic parameter is not guaranteed to be
   a `list`, because a named argument gives the collected array a string key.
 - **PHPUnit strict settings** — the suite fails on warnings and on risky tests.
-- **Mutation testing** (Infection) was used during development and reached an
-  MSI of 93%. It found that `round()` could be replaced with `floor()` or
+- **Mutation testing** (Infection) was run during development, reaching a
+  mutation score of 95%. It is not part of the committed tooling and needs a
+  coverage driver, so that figure is a development-time measurement rather than
+  something this repository reproduces. It found that `round()` could be
+  replaced with `floor()` or
   `ceil()` without a single test failing, because PHPUnit attributes coverage
   only to the classes a test declares with `#[CoversClass]`, and the conversion
   cases lived in the wrong test class. The surviving mutants are documented

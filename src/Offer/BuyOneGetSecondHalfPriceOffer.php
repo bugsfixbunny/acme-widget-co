@@ -36,9 +36,10 @@ final readonly class BuyOneGetSecondHalfPriceOffer implements Offer
         $fullPrice = $matching[0]->priceInCents;
 
         // Half of an odd number of cents cannot be paid, so the half-price item
-        // is rounded down to the cent and the shop keeps the odd half cent:
-        // $32.95 becomes $16.47, making the discount $16.48. That is what makes
-        // two red widgets come to $49.42 rather than $49.43.
+        // is rounded down to the cent and the customer keeps the odd half cent:
+        // $32.95 becomes $16.47, making the discount $16.48 rather than
+        // $16.475. That is what makes two red widgets come to $49.42 rather
+        // than $49.43.
         $halfPrice = intdiv($fullPrice, 2);
 
         return $pairs * ($fullPrice - $halfPrice);

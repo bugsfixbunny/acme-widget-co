@@ -46,10 +46,11 @@ final class BuyOneGetSecondHalfPriceOfferTest extends TestCase
     /**
      * Half of $32.95 is $16.475, which cannot be paid. The half-price widget is
      * rounded down to $16.47, so the discount is $16.48 and the pair costs
-     * $49.42. Rounding the other way would make the documented basket totals
-     * $54.38 and $98.28 instead of $54.37 and $98.27.
+     * $49.42 — the customer is half a cent better off. Rounding the other way
+     * would make the documented basket totals $54.38 and $98.28 instead of
+     * $54.37 and $98.27.
      */
-    public function test_the_odd_half_cent_is_kept_by_the_shop(): void
+    public function test_the_odd_half_cent_goes_to_the_customer(): void
     {
         $pair = self::redWidgets(2);
         $discount = $this->offer->discountFor($pair);
